@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>One NT — Super Seasonal Celebration!</title>
+  <style>
+    :root{
+      --bg-top:#071827;
+      --bg-bottom:#08122a;
+      --card:#071028;
+      --accent:#9be7ff;
+      --accent-2:#bfe6ff;
+      --text:#f3f8ff;
+      --muted:rgba(243,248,255,0.78);
+      --glass:rgba(255,255,255,0.03);
+      --shadow: 0 8px 26px rgba(2,8,20,0.7);
+    }
+
+    /* original font stack applied site-wide; title will use same stack */
+    html,body{height:100%;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;background:linear-gradient(180deg,var(--bg-top) 0%,var(--bg-bottom) 100%);color:var(--text);-webkit-font-smoothing:antialiased}
+    body{padding:24px;display:flex;flex-direction:column;align-items:center;gap:16px}
+
+    header{width:100%;max-width:1100px;display:flex;flex-direction:column;align-items:center;gap:10px;position:relative}
+    h1{margin:0;font-weight:600;font-size:28px}
+    .subtitle{font-size:13px;color:var(--muted)}
+
+    /* falling snow layer */
+    .snow-layer{position:fixed;left:0;right:0;top:0;bottom:0;pointer-events:none;z-index:150;overflow:hidden}
+    .flake{position:absolute;color:var(--accent-2);font-size:14px;opacity:0.95;will-change:transform;animation:fall linear infinite;mix-blend-mode:screen}
+    @keyframes fall {
+      0% {transform:translateY(-10vh) translateX(0) rotate(0);opacity:0}
+      10% {opacity:1}
+      100% {transform:translateY(110vh) translateX(40vw) rotate(360deg);opacity:0.9}
+    }
+
+    /* gallery grid */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;max-width:1100px;width:100%;margin-top:8px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:12px;padding:10px;text-align:center;border:1px solid rgba(255,255,255,0.04);box-shadow:var(--shadow);position:relative;overflow:hidden}
+    .thumb{width:100%;border-radius:10px;cursor:pointer;transition:transform .18s,filter .18s}
+    .thumb:hover{transform:translateY(-6px) scale(1.02);filter:brightness(1.04)}
+    .filename{font-size:13px;margin-top:9px;color:var(--muted);font-weight:600}
+
+    /* frosted overlay & snow cap on cards */
+    .card:before{content:"";position:absolute;left:0;right:0;top:0;height:28px;background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0));border-top-left-radius:12px;border-top-right-radius:12px}
+    .snow-cap{position:absolute;left:10px;top:8px;width:calc(100% - 20px);height:12px;border-radius:8px;background:linear-gradient(180deg,#ffffff88,#ffffff33);opacity:0.5;pointer-events:none}
+
+    /* modal */
+    .modal{position:fixed;inset:0;background:linear-gradient(180deg, rgba(3,9,20,0.7), rgba(1,6,12,0.9));display:flex;align-items:center;justify-content:center;z-index:1000;padding:28px;backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .18s}
+    .modal.open{opacity:1;pointer-events:auto}
+    .modal-content{background:linear-gradient(180deg,#081427,#061023);padding:16px;border-radius:14px;max-width:92vw;max-height:90vh;display:flex;flex-direction:column;align-items:center;gap:12px;border:1px solid rgba(255,255,255,0.03)}
+    .modal-body{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center;width:100%}
+    .modal img.main{max-width:calc(72vw);max-height:72vh;border-radius:8px;box-shadow:0 12px 40px rgba(2,8,20,0.7)}
+    .qr-panel{width:128px;min-width:96px;display:flex;flex-direction:column;align-items:center;gap:8px}
+    .qr-panel img{width:128px;height:128px;border-radius:8px;background:rgba(255,255,255,0.02);padding:6px;border:1px solid rgba(255,255,255,0.04)}
+    .qr-hint{font-size:12px;color:var(--muted);text-align:center}
+
+    .caption{margin-top:6px;font-size:15px;color:var(--muted);text-align:center}
+
+    .meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+    .btn{background:linear-gradient(90deg,var(--accent-2),var(--accent));color:#001827;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700;border:none;cursor:pointer}
+    .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);font-weight:600}
+    .close{position:fixed;top:18px;right:20px;font-size:30px;color:#fff;cursor:pointer;background:rgba(255,255,255,0.03);padding:8px;border-radius:999px;border:1px solid rgba(255,255,255,0.04);z-index:1010}
+
+    /* responsive */
+    @media (max-width:820px){
+      .modal-body{flex-direction:column}
+      .modal img.main{max-width:92vw}
+      .qr-panel{flex-direction:row;gap:12px;align-items:center}
+      .qr-panel img{width:96px;height:96px}
+    }
+    @media (max-width:520px){
+      .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+      h1{font-size:22px}
+    }
+  </style>
+</head>
+<body>
+  <!-- falling snow -->
+  <div class="snow-layer" aria-hidden="true" id="snowLayer"></div>
+
+  <header>
+    <h1>One NT - Super Seasonal Celebration!</h1>
+    <div class="subtitle">Thanks for using the photobooth — click any photo to open</div>
+  </header>
+
+  <main style="width:100%;max-width:1100px">
+    <div class="grid" id="gallery" aria-live="polite"></div>
+  </main>
+
+  <div class="modal" id="modal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalCaption">
+      <div class="modal-body">
+        <img id="modalImg" class="main" src="" alt="Full image" />
+        <div class="qr-panel" id="qrPanel" aria-hidden="true">
+          <img id="qrImg" src="" alt="QR code to download image" />
+          <div class="qr-hint">Scan to open<br/>or save on mobile</div>
+        </div>
+      </div>
+      <div class="caption" id="modalCaption"></div>
+      <div class="meta">
+        <button class="btn" id="downloadBtn">Download</button>
+        <a class="btn secondary" id="openBtn" target="_blank" rel="noopener">Open full image</a>
+        <button class="btn secondary" id="shareBtn" style="display:none">Share</button>
+      </div>
+    </div>
+    <div class="close" onclick="closeModal()" aria-label="Close">×</div>
+  </div>
+
+  <script>
+    const MANIFEST_URL = 'thumbs.json';
+    const gallery = document.getElementById('gallery');
+    const modal = document.getElementById('modal');
+    const modalImg = document.getElementById('modalImg');
+    const modalCaption = document.getElementById('modalCaption');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const openBtn = document.getElementById('openBtn');
+    const shareBtn = document.getElementById('shareBtn');
+    const snowLayer = document.getElementById('snowLayer');
+    const qrPanel = document.getElementById('qrPanel');
+    const qrImg = document.getElementById('qrImg');
+
+    let items = [];
+    let currentIndex = -1;
+    const knownFiles = new Set(); // track by full image URL (stable identifier)
+
+    // create snowflakes dynamically for visual depth
+    function createSnow(count = 36) {
+      const symbols = ['❅','❆','❄'];
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'flake';
+        el.textContent = symbols[i % symbols.length];
+        el.style.left = (Math.random() * 100) + 'vw';
+        el.style.fontSize = (8 + Math.random() * 18) + 'px';
+        el.style.opacity = (0.5 + Math.random() * 0.5).toString();
+        el.style.animationDuration = (6 + Math.random() * 8) + 's';
+        el.style.animationDelay = (Math.random() * 5) + 's';
+        snowLayer.appendChild(el);
+      }
+    }
+
+    // render a single card and bind its index
+    function renderCard(item) {
+      const index = items.length - 1; // index after push
+      const { thumb, filename } = item;
+
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      const snowcap = document.createElement('div');
+      snowcap.className = 'snow-cap';
+      card.appendChild(snowcap);
+
+      const img = document.createElement('img');
+      img.src = thumb;
+      img.className = 'thumb';
+      img.alt = filename || `Photo ${index + 1}`;
+      img.loading = 'lazy';
+      img.onclick = () => openModal(index);
+
+      const label = document.createElement('div');
+      label.className = 'filename';
+      label.textContent = filename || `Photo ${index + 1}`;
+
+      card.appendChild(img);
+      card.appendChild(label);
+      gallery.appendChild(card);
+    }
+
+    // initial load: build from manifest
+    async function loadGallery() {
+      try {
+        const res = await fetch(MANIFEST_URL + '?t=' + Date.now());
+        const list = await res.json();
+
+        if (!Array.isArray(list) || list.length === 0) {
+          gallery.innerHTML = '<p style="color:#f88">No photos found for this season.</p>';
+          return;
+        }
+
+        list.forEach((item) => {
+          // dedupe by full image URL
+          if (!item || !item.full || knownFiles.has(item.full)) return;
+          items.push(item);
+          knownFiles.add(item.full);
+          renderCard(item);
+        });
+      } catch (e) {
+        gallery.innerHTML = '<p style="color:#f88">Failed to load gallery.</p>';
+        console.error('Gallery load error', e);
+      }
+    }
+
+    // auto-update: append only new items, keep existing indices stable
+    async function updateGallery() {
+      try {
+        const res = await fetch(MANIFEST_URL + '?t=' + Date.now());
+        const list = await res.json();
+        if (!Array.isArray(list) || list.length === 0) return;
+
+        list.forEach((item) => {
+          if (!item || !item.full || knownFiles.has(item.full)) return;
+          items.push(item);
+          knownFiles.add(item.full);
+          renderCard(item);
+        });
+      } catch (e) {
+        console.warn('Gallery update skipped (fetch failed):', e);
+      }
+    }
+
+    function openModal(index) {
+      currentIndex = index;
+      const { full, filename, qrcode } = items[index] || {};
+      modalImg.src = full || '';
+      modalImg.alt = filename || '';
+      modalCaption.textContent = filename || '';
+
+      // Download button
+      downloadBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = full || '';
+        a.download = filename || '';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      };
+
+      // Open link
+      openBtn.href = full || '#';
+
+      // Share button (Web Share API)
+      shareBtn.style.display = (navigator.share) ? 'inline-block' : 'none';
+      shareBtn.onclick = () => {
+        navigator.share({
+          title: filename,
+          text: 'Check out this winter selfie!',
+          url: full
+        }).catch(err => console.log('Share failed:', err));
+      };
+
+      // QR code handling: show panel only if qrcode available
+      if (qrcode) {
+        qrImg.src = qrcode;
+        qrImg.alt = 'QR code linking to the image';
+        qrPanel.setAttribute('aria-hidden', 'false');
+        qrPanel.style.display = 'flex';
+      } else {
+        qrImg.src = '';
+        qrImg.alt = '';
+        qrPanel.setAttribute('aria-hidden', 'true');
+        qrPanel.style.display = 'none';
+      }
+
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden', 'false');
+      setTimeout(() => downloadBtn.focus(), 120);
+    }
+
+    function closeModal() {
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden', 'true');
+      modalImg.src = '';
+      qrImg.src = '';
+      currentIndex = -1;
+    }
+
+    function showNext() {
+      if (currentIndex < items.length - 1) openModal(currentIndex + 1);
+    }
+
+    function showPrev() {
+      if (currentIndex > 0) openModal(currentIndex - 1);
+    }
+
+    document.addEventListener('keydown', e => {
+      if (modal.classList.contains('open')) {
+        if (e.key === 'ArrowRight') showNext();
+        if (e.key === 'ArrowLeft') showPrev();
+        if (e.key === 'Escape') closeModal();
+      }
+    });
+
+    // touch swipe for mobile
+    let touchStartX = 0;
+    modal.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
+    modal.addEventListener('touchend', e => {
+      const deltaX = e.changedTouches[0].screenX - touchStartX;
+      if (Math.abs(deltaX) > 50) { if (deltaX < 0) showNext(); else showPrev(); }
+    });
+
+    // initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      createSnow(36);
+      loadGallery();
+      // poll every 10s for new items; pause when tab hidden to save cycles
+      let pollId = setInterval(updateGallery, 10000);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          clearInterval(pollId);
+        } else {
+          updateGallery(); // catch up immediately
+          pollId = setInterval(updateGallery, 10000);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

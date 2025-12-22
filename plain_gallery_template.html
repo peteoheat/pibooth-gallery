@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Party Selfie</title>
+  <meta name="color-scheme" content="dark light">
+  <style>
+    :root{
+      --bg:#071024; --panel:rgba(255,255,255,0.02);
+      --accent:#06b6d4; --text:#e6f0f6; --muted:rgba(230,240,246,0.14);
+    }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;background:linear-gradient(180deg,#071024 0%, #071827 100%);color:var(--text)}
+    .container{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px}
+    .wrap{width:100%;max-width:920px;background:var(--panel);border-radius:12px;box-shadow:0 6px 30px rgba(2,6,23,0.6);overflow:hidden;display:flex;flex-direction:column}
+    .imgbox{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px}
+    .frame{width:100%;max-height:72vh;display:flex;align-items:center;justify-content:center}
+    img#photo{max-width:100%;max-height:72vh;height:auto;display:block;border-radius:8px;cursor:zoom-in;transition:transform .22s ease, filter .15s ease}
+    img.error{opacity:.6;filter:grayscale(.4)}
+    .qr-panel{margin-top:12px;display:none;flex-direction:column;align-items:center;gap:6px}
+    .qr-panel img{width:128px;height:128px;border-radius:8px;background:rgba(255,255,255,0.02);padding:6px;border:1px solid rgba(255,255,255,0.06)}
+    .qr-hint{font-size:13px;color:var(--muted);text-align:center}
+    .meta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px}
+    .title{flex:1;min-width:0}
+    .fn{font-size:15px;opacity:.95;word-break:break-all}
+    .sub{font-size:13px;opacity:.8;margin-top:6px}
+    .buttons{display:flex;gap:8px;align-items:center}
+    .btn{background:var(--accent);color:#042;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+    .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.08);color:var(--text);font-weight:700}
+    .hint{font-size:13px;opacity:.85;padding:0 12px 18px}
+    .fallback{padding:18px;text-align:center;color:#ffcccb;background:rgba(255,0,0,0.03);display:none}
+    @media (max-width:520px){
+      .meta{padding:10px;gap:8px}
+      .btn{padding:10px 12px;font-size:15px}
+      .fn{font-size:14px}
+      .qr-panel img{width:96px;height:96px}
+    }
+    .zoomed img#photo{transform:scale(2);cursor:zoom-out}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="wrap" id="app">
+      <div id="fallback" class="fallback">No image specified. Scan the QR on the booth or open the shared link.</div>
+
+      <div id="content" style="display:none">
+        <div class="imgbox">
+          <div class="frame" id="frame">
+            <img id="photo" alt="Party selfie" loading="eager" crossorigin="anonymous" />
+          </div>
+          <div class="qr-panel" id="qrPanel">
+            <img id="qrImg" alt="QR code to open image" />
+            <div class="qr-hint">Scan to open<br/>on your phone</div>
+          </div>
+        </div>
+
+        <div class="meta">
+          <div class="title">
+            <div class="fn" id="filename">...</div>
+            <div class="sub" id="subtitle">Tap image to open; pinch to zoom; use Download for full-resolution copy</div>
+          </div>
+
+          <div class="buttons" id="actions">
+            <button class="btn" id="downloadBtn" aria-label="Download image">Download</button>
+            <a id="openBtn" class="btn secondary" target="_blank" rel="noopener noreferrer">Open</a>
+            <button class="btn secondary" id="shareBtn" style="display:none">Share</button>
+          </div>
+        </div>
+
+        <div class="hint" id="hint">If the download gives a lower-resolution file, open the image and use your browser's Save or Share → Save for full resolution.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const IMAGE_HOST_BASE = 'https://myselfie.pictures/OneNT/';
+    const content = document.getElementById('content');
+    const fallback = document.getElementById('fallback');
+    const imgEl = document.getElementById('photo');
+    const fnEl = document.getElementById('filename');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const openBtn = document.getElementById('openBtn');
+    const shareBtn = document.getElementById('shareBtn');
+    const frame = document.getElementById('frame');
+    const qrPanel = document.getElementById('qrPanel');
+    const qrImg = document.getElementById('qrImg');
+
+    let currentFull = null;
+    let currentFilename = null;
+    let isZoomed = false;
+    let touchStartDist = 0;
+
+    function dbg(...args){ try{ console.log(...args); }catch(e){} }
+
+    function getImageIdentifier(){
+      const url = new URL(window.location.href);
+      const raw = url.searchParams.get('img');
+      if(raw) return raw;
+      const pathParts = url.pathname.split('/').filter(Boolean);
+      if(pathParts.length > 1) return pathParts[pathParts.length - 1];
+      return null;
+    }
+
+    function normalizeToFullURL(id){
+      if(!id) return null;
+      try{
+        const maybe = new URL(id);
+        if(maybe.protocol === 'http:' || maybe.protocol === 'https:'){
+          dbg('normalize: absolute URL detected', maybe.href);
+          return maybe.href;
+        }
+      }catch(e){}
+      const cleanedBase = IMAGE_HOST_BASE.replace(/\/+$/, '');
+      const parts = id.split('/').map(p => encodeURIComponent(p)).join('/');
+      return cleanedBase + '/' + parts;
+    }
+
+    (function init(){
+      const id = getImageIdentifier();
+      if(!id){
+        fallback.style.display = 'block';
+        dbg('no image id present');
+        return;
+      }
+
+      currentFilename = id.split('/').pop();
+      currentFull = normalizeToFullURL(id);
+
+      dbg('image id:', id);
+      dbg('resolved full URL:', currentFull);
+
+      imgEl.crossOrigin = 'anonymous';
+      imgEl.loading = 'eager';
+      imgEl.alt = currentFilename;
+      fnEl.textContent = currentFilename;
+      openBtn.href = currentFull;
+
+      if(navigator.share) shareBtn.style.display = 'inline-block';
+      imgEl.src = currentFull;
+
+      // QR handling: if filename follows _pibooth.jpg convention, try the corresponding _pibooth_qrcode.png
+      if(currentFilename && currentFilename.endsWith('_pibooth.jpg')){
+        const qrUrl = currentFull.replace('_pibooth.jpg', '_pibooth_qrcode.png');
+        qrImg.src = qrUrl;
+        qrImg.onload = () => { qrPanel.style.display = 'flex'; };
+        qrImg.onerror = () => { qrPanel.style.display = 'none'; };
+      } else {
+        qrPanel.style.display = 'none';
+      }
+
+      imgEl.addEventListener('load', ()=> {
+        content.style.display = 'block';
+        fallback.style.display = 'none';
+        dbg('image loaded successfully');
+      });
+
+      imgEl.addEventListener('error', (ev)=> {
+        content.style.display = 'none';
+        fallback.textContent = 'Failed to load image. Check the URL or that the image is uploaded.';
+        fallback.style.display = 'block';
+        imgEl.classList.add('error');
+        dbg('image load error', ev);
+      });
+
+      imgEl.addEventListener('click', ()=> {
+        if(window.innerWidth > 720) toggleZoom();
+        else window.open(currentFull, '_blank');
+      });
+
+      downloadBtn.addEventListener('click', ()=>{
+        try {
+          fetch(currentFull, {mode: 'cors'}).then(resp => {
+            if(!resp.ok) throw new Error('Network response not ok ' + resp.status);
+            return resp.blob();
+          }).then(blob => {
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = currentFilename || 'selfie.jpg';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(()=>URL.revokeObjectURL(blobUrl), 3000);
+          }).catch(err => {
+            dbg('fetch download failed, falling back to anchor/open', err);
+            const a = document.createElement('a');
+            a.href = currentFull;
+            a.download = currentFilename || 'selfie.jpg';
+            document.body.appendChild(a);
+            try { a.click(); } catch(e) { window.open(currentFull, '_blank'); }
+            a.remove();
+          });
+        } catch (e) {
+          dbg('download fallback error', e);
+          window.open(currentFull, '_blank');
+        }
+      });
+
+      shareBtn.addEventListener('click', async ()=>{
+        if(!navigator.share) return;
+        try{
+          await navigator.share({title: currentFilename, text: 'Check out my party selfie!', url: currentFull});
+        }catch(e){
+          dbg('share failed', e);
+        }
+      });
+
+      frame.addEventListener('touchstart', (ev)=>{
+        if(ev.touches.length === 2) touchStartDist = distance(ev.touches[0], ev.touches[1]);
+      }, {passive:true});
+      frame.addEventListener('touchmove', (ev)=>{
+        if(ev.touches.length === 2){
+          const d = distance(ev.touches[0], ev.touches[1]);
+          if(touchStartDist && Math.abs(d - touchStartDist) > 40){
+            if(d > touchStartDist) toggleZoom(true); else toggleZoom(false);
+            touchStartDist = 0;
+          }
+        }
+      }, {passive:true});
+
+      document.addEventListener('keydown', (e)=> {
+        if(e.key === 'Escape' && isZoomed) toggleZoom(false);
+      });
+    })();
+
+    function toggleZoom(force){
+      if(typeof force === 'boolean') isZoomed = force;
+      else isZoomed = !isZoomed;
+      const wrap = document.querySelector('.wrap');
+      if(isZoomed){
+        wrap.classList.add('zoomed');
+        imgEl.style.transform = 'scale(2)';
+        imgEl.style.cursor = 'zoom-out';
+      } else {
+        wrap.classList.remove('zoomed');
+        imgEl.style.transform = '';
+        imgEl.style.cursor = 'zoom-in';
+      }
+    }
+
+    function distance(t1,t2){
+      const dx = t2.clientX - t1.clientX;
+      const dy = t2.clientY - t1.clientY;
+      return Math.sqrt(dx*dx+dy*dy);
+    }
+
+    window.__pibooth_debug = {
+      currentFull: () => currentFull,
+      imgSrc: () => imgEl?.src,
+      imgLoading: () => imgEl?.loading,
+      imgCrossOrigin: () => imgEl?.crossOrigin
+    };
+  </script>
+</body>
+</html>
