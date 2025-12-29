@@ -3,6 +3,15 @@ PiBooth Gallery is a module created for pibooth to create a web gallery with thu
 it works alongside pibooth-qrcode which creates the QR code that can be used to download the image, 
 but also provides a simple download button and a share button to enable sharing via whatsapp etc on a mobile device.
 
+# Installation
+
+1. Copy pibooth-gallery.py into the locaton defined in your pibooth.cfg where you source custom plugins
+2. Update your pibooth.cfg to call the new module
+3. Update your pibooth.cfg with the options required by the GALLERY module
+
+        #Path to custom plugin(s) not installed with pip (list of quoted paths accepted)
+        plugins = ('/home/pi/PiBooth_plugins/pibooth-gallery.py', '/home/pi/PiBooth_plugins/pibooth-rclone-upload.py', '/home/pi/PiBooth_plugins/pibooth-qrcode.py')
+
 Configuration
 -------------
 
